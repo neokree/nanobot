@@ -859,7 +859,8 @@ def status():
                 else:
                     console.print(f"{spec.label}: [dim]not set[/dim]")
             else:
-                has_key = bool(p.api_key)
+                # Check both api_key and setup_token (for Anthropic OAuth)
+                has_key = bool(p.api_key or getattr(p, 'setup_token', None))
                 console.print(f"{spec.label}: {'[green]✓[/green]' if has_key else '[dim]not set[/dim]'}")
 
 
