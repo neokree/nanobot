@@ -270,10 +270,20 @@ This file stores important information that should persist across sessions.
 
 
 def _make_provider(config):
-    """Create LiteLLMProvider from config. Exits if no API key found."""
-    from nanobot.providers.litellm_provider import LiteLLMProvider
+    """Create LLM provider from config. Uses OAuth provider for setup-tokens, LiteLLM otherwise."""
     p = config.get_provider()
     model = config.agents.defaults.model
+
+    # Check for Anthropic OAuth setup-token (sk-ant-oat01-...)
+    if p and p.setup_token:
+        from nanobot.providers.anthropic_oauth_provider import AnthropicOAuthProvider
+        console.print("[dim]Using Anthropic OAuth (setup-token)[/dim]")
+        return AnthropicOAuthProvider(
+            setup_token=p.setup_token,
+            default_model=model,
+        )
+
+    from nanobot.providers.litellm_provider import LiteLLMProvider
     if not (p and p.api_key) and not model.startswith("bedrock/"):
         console.print("[red]Error: No API key configured.[/red]")
         console.print("Set one in ~/.nanobot/config.json under providers section")
