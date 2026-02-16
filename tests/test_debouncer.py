@@ -142,3 +142,59 @@ async def test_independent_sessions(bus, debouncer):
     finally:
         debouncer.stop()
         task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_collect_when_agent_busy(bus, debouncer):
+    """Messages arriving when agent is busy should go to collect queue."""
+    task = asyncio.create_task(debouncer.run())
+    try:
+        # First message — agent is free
+        await _publish(bus, "First")
+        msg1 = await asyncio.wait_for(debouncer.consume(), timeout=1.0)
+        assert msg1.content == "First"
+
+        # Agent starts processing
+        debouncer.notify_agent_busy()
+
+        # Second message while agent is busy
+        await _publish(bus, "Second")
+        await asyncio.sleep(0.1)  # Let debounce timer fire
+
+        # Should NOT be available on ready queue
+        assert debouncer._ready.empty()
+
+        # Agent finishes — collected message should become available
+        debouncer.notify_agent_free()
+        msg2 = await asyncio.wait_for(debouncer.consume(), timeout=1.0)
+        assert msg2.content == "Second"
+    finally:
+        debouncer.stop()
+        task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_collect_preserves_order(bus, debouncer):
+    """Multiple collected messages should be released in FIFO order."""
+    task = asyncio.create_task(debouncer.run())
+    try:
+        debouncer.notify_agent_busy()
+
+        await _publish(bus, "A", chat_id="aaa")
+        await asyncio.sleep(0.1)
+        await _publish(bus, "B", chat_id="bbb")
+        await asyncio.sleep(0.1)
+
+        # Release first
+        debouncer.notify_agent_free()
+        msg1 = await asyncio.wait_for(debouncer.consume(), timeout=1.0)
+        assert msg1.content == "A"
+
+        # Simulate busy again, then release
+        debouncer.notify_agent_busy()
+        debouncer.notify_agent_free()
+        msg2 = await asyncio.wait_for(debouncer.consume(), timeout=1.0)
+        assert msg2.content == "B"
+    finally:
+        debouncer.stop()
+        task.cancel()
