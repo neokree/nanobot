@@ -175,8 +175,7 @@ class ProviderConfig(BaseModel):
     api_key: str = ""
     api_base: str | None = None
     extra_headers: dict[str, str] | None = None  # Custom headers (e.g. APP-Code for AiHubMix)
-    setup_token: str = ""  # Claude Code OAuth setup-token (sk-ant-oat01-...)
-    auth_method: str = "setup-token"  # "setup-token" | "claude-code" | "api-key"
+    auth_method: str = "claude-code"  # "claude-code" | "api-key"
 
 
 class ProvidersConfig(BaseModel):

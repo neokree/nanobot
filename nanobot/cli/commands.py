@@ -279,16 +279,15 @@ This file stores important information that should persist across sessions.
 
 
 def _make_provider(config):
-    """Create LLM provider from config. Uses OAuth provider for setup-tokens, LiteLLM otherwise."""
+    """Create LLM provider from config. Uses OAuth provider for claude-code auth, LiteLLM otherwise."""
     p = config.get_provider()
     model = config.agents.defaults.model
 
-    # Check for Anthropic OAuth setup-token (sk-ant-oat01-...)
-    if p and p.setup_token:
+    # Check for Anthropic OAuth with Claude Code credentials
+    if p and p.auth_method == "claude-code":
         from nanobot.providers.anthropic_oauth_provider import AnthropicOAuthProvider
-        console.print("[dim]Using Anthropic OAuth (setup-token)[/dim]")
+        console.print("[dim]Using Anthropic OAuth (Claude Code auto-refresh)[/dim]")
         return AnthropicOAuthProvider(
-            setup_token=p.setup_token,
             default_model=model,
         )
 
