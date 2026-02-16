@@ -53,10 +53,13 @@ class AgentLoop:
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
+        debouncer: "InboundDebouncer | None" = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         from nanobot.cron.service import CronService
+        from nanobot.bus.debouncer import InboundDebouncer
         self.bus = bus
+        self.debouncer = debouncer
         self.provider = provider
         self.workspace = workspace
         self.model = model or provider.get_default_model()
@@ -212,10 +215,16 @@ class AgentLoop:
 
         while self._running:
             try:
-                msg = await asyncio.wait_for(
-                    self.bus.consume_inbound(),
-                    timeout=1.0
-                )
+                if self.debouncer:
+                    self.debouncer.notify_agent_free()
+                    msg = await asyncio.wait_for(
+                        self.debouncer.consume(), timeout=1.0
+                    )
+                    self.debouncer.notify_agent_busy()
+                else:
+                    msg = await asyncio.wait_for(
+                        self.bus.consume_inbound(), timeout=1.0
+                    )
                 try:
                     response = await self._process_message(msg)
                     if response:
