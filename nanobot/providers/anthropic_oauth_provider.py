@@ -330,11 +330,23 @@ class AnthropicOAuthProvider(LLMProvider):
                     if content:
                         blocks.append({"type": "text", "text": content})
                     for tc in tool_calls:
+                        # Extract function details from OpenAI-format tool_call
+                        func = tc.get("function", {})
+                        func_name = func.get("name", "")
+                        func_args = func.get("arguments", "{}")
+
+                        # Parse arguments if they're a JSON string
+                        if isinstance(func_args, str):
+                            try:
+                                func_args = json.loads(func_args)
+                            except json.JSONDecodeError:
+                                func_args = {}
+
                         blocks.append({
                             "type": "tool_use",
                             "id": tc.get("id", ""),
-                            "name": tc.get("name", ""),
-                            "input": tc.get("arguments", {}),
+                            "name": func_name,
+                            "input": func_args,
                         })
                     api_messages.append({"role": "assistant", "content": blocks})
                 else:
