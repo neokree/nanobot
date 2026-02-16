@@ -96,6 +96,151 @@ def needs_refresh(expires_at_ms: int) -> bool:
     return (expires_at_ms - now_ms) < margin_ms
 
 
+async def refresh_access_token(refresh_token: str) -> dict[str, Any]:
+    """
+    Refresh OAuth access token using Claude Code's refresh_token.
+
+    Args:
+        refresh_token: The refresh token from claudeAiOauth
+
+    Returns:
+        Dict with new tokens:
+        - access_token (str)
+        - refresh_token (str) - may be same or new
+        - expires_in (int) - seconds until expiry
+
+    Raises:
+        httpx.HTTPStatusError: If refresh request fails
+    """
+    payload = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": CLAUDE_CODE_CLIENT_ID,
+        "scope": CLAUDE_CODE_SCOPES,
+    }
+
+    logger.info("Refreshing Claude OAuth access token...")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            CLAUDE_CODE_TOKEN_URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    # Validate response
+    required = ["access_token", "expires_in"]
+    missing = [k for k in required if k not in data]
+    if missing:
+        raise ValueError(f"Token refresh response missing fields: {missing}")
+
+    logger.info("OAuth access token refreshed successfully")
+    return data
+
+
+def save_credentials(
+    access_token: str,
+    refresh_token: str,
+    expires_in: int,
+    existing_creds: dict[str, Any],
+) -> None:
+    """
+    Update ~/.claude/.credentials.json with new tokens.
+
+    Args:
+        access_token: New access token
+        refresh_token: New refresh token (may be same as old)
+        expires_in: Seconds until expiry
+        existing_creds: Current claudeAiOauth dict (for preserving other fields)
+    """
+    expires_at_ms = int((time.time() + expires_in) * 1000)
+
+    # Update credentials
+    updated_oauth = {
+        **existing_creds,
+        "accessToken": access_token,
+        "refreshToken": refresh_token,
+        "expiresAt": expires_at_ms,
+    }
+
+    # Read full file to preserve other fields
+    try:
+        if CLAUDE_CODE_CREDENTIALS_PATH.exists():
+            with open(CLAUDE_CODE_CREDENTIALS_PATH, "r", encoding="utf-8") as f:
+                full_data = json.load(f)
+        else:
+            full_data = {}
+
+        full_data["claudeAiOauth"] = updated_oauth
+
+        # Write atomically (write to temp, then rename)
+        temp_path = CLAUDE_CODE_CREDENTIALS_PATH.with_suffix(".tmp")
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(full_data, f, indent=2)
+
+        temp_path.replace(CLAUDE_CODE_CREDENTIALS_PATH)
+
+        # Ensure file is readable only by user (security)
+        CLAUDE_CODE_CREDENTIALS_PATH.chmod(0o600)
+
+        logger.info("Updated credentials file with new tokens")
+
+    except Exception as e:
+        logger.error("Failed to save credentials: %s", e)
+        raise
+
+
+async def get_valid_access_token() -> str:
+    """
+    Get a valid access token, refreshing if needed.
+
+    Returns:
+        Valid access token ready to use
+
+    Raises:
+        ValueError: If credentials not found or refresh fails
+    """
+    creds = read_claude_code_credentials()
+    if not creds:
+        raise ValueError(
+            "No Claude Code credentials found. Run `claude auth login` first."
+        )
+
+    access_token = creds["accessToken"]
+    refresh_token = creds["refreshToken"]
+    expires_at = creds["expiresAt"]
+
+    # Check if token needs refresh
+    if needs_refresh(expires_at):
+        logger.info("Access token expires soon, refreshing...")
+
+        try:
+            refresh_data = await refresh_access_token(refresh_token)
+
+            # Save new tokens
+            save_credentials(
+                access_token=refresh_data["access_token"],
+                refresh_token=refresh_data.get("refresh_token", refresh_token),
+                expires_in=refresh_data["expires_in"],
+                existing_creds=creds,
+            )
+
+            # Return new token
+            return refresh_data["access_token"]
+
+        except Exception as e:
+            logger.error("Token refresh failed: %s", e)
+            logger.warning("Falling back to potentially expired token")
+            # Try to use old token anyway (might still work)
+            return access_token
+
+    # Token is still valid
+    return access_token
+
+
 def validate_setup_token(token: str) -> str | None:
     """Validate setup-token format. Returns error message or None if valid."""
     token = token.strip()
