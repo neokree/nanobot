@@ -11,6 +11,7 @@ class WhatsAppConfig(BaseModel):
     bridge_url: str = "ws://localhost:3001"
     bridge_token: str = ""  # Shared token for bridge auth (optional, recommended)
     allow_from: list[str] = Field(default_factory=list)  # Allowed phone numbers
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class TelegramConfig(BaseModel):
@@ -19,6 +20,7 @@ class TelegramConfig(BaseModel):
     token: str = ""  # Bot token from @BotFather
     allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs or usernames
     proxy: str | None = None  # HTTP/SOCKS5 proxy URL, e.g. "http://127.0.0.1:7890" or "socks5://127.0.0.1:1080"
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class FeishuConfig(BaseModel):
@@ -29,6 +31,7 @@ class FeishuConfig(BaseModel):
     encrypt_key: str = ""  # Encrypt Key for event subscription (optional)
     verification_token: str = ""  # Verification Token for event subscription (optional)
     allow_from: list[str] = Field(default_factory=list)  # Allowed user open_ids
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class DingTalkConfig(BaseModel):
@@ -37,6 +40,7 @@ class DingTalkConfig(BaseModel):
     client_id: str = ""  # AppKey
     client_secret: str = ""  # AppSecret
     allow_from: list[str] = Field(default_factory=list)  # Allowed staff_ids
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class DiscordConfig(BaseModel):
@@ -46,6 +50,7 @@ class DiscordConfig(BaseModel):
     allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs
     gateway_url: str = "wss://gateway.discord.gg/?v=10&encoding=json"
     intents: int = 37377  # GUILDS + GUILD_MESSAGES + DIRECT_MESSAGES + MESSAGE_CONTENT
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 class EmailConfig(BaseModel):
     """Email channel configuration (IMAP inbound + SMTP outbound)."""
@@ -112,6 +117,7 @@ class MochatConfig(BaseModel):
     groups: dict[str, MochatGroupRule] = Field(default_factory=dict)
     reply_delay_mode: str = "non-mention"  # off | non-mention
     reply_delay_ms: int = 120000
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class SlackDMConfig(BaseModel):
@@ -132,6 +138,7 @@ class SlackConfig(BaseModel):
     group_policy: str = "mention"  # "mention", "open", "allowlist"
     group_allow_from: list[str] = Field(default_factory=list)  # Allowed channel IDs if allowlist
     dm: SlackDMConfig = Field(default_factory=SlackDMConfig)
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class QQConfig(BaseModel):
@@ -140,6 +147,7 @@ class QQConfig(BaseModel):
     app_id: str = ""  # 机器人 ID (AppID) from q.qq.com
     secret: str = ""  # 机器人密钥 (AppSecret) from q.qq.com
     allow_from: list[str] = Field(default_factory=list)  # Allowed user openids (empty = public access)
+    debounce: int | None = None  # Debounce delay in ms (None = use default)
 
 
 class ChannelsConfig(BaseModel):
