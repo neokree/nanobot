@@ -254,13 +254,13 @@ class Config(BaseSettings):
         # Match by keyword (order follows PROVIDERS registry)
         for spec in PROVIDERS:
             p = getattr(self.providers, spec.name, None)
-            if p and any(kw in model_lower for kw in spec.keywords) and (p.api_key or p.setup_token):
+            if p and any(kw in model_lower for kw in spec.keywords) and (p.api_key or p.auth_method == "claude-code"):
                 return p, spec.name
 
         # Fallback: gateways first, then others (follows registry order)
         for spec in PROVIDERS:
             p = getattr(self.providers, spec.name, None)
-            if p and (p.api_key or p.setup_token):
+            if p and (p.api_key or p.auth_method == "claude-code"):
                 return p, spec.name
         return None, None
 
