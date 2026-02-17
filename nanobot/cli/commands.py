@@ -333,6 +333,17 @@ def gateway(
     
     config = load_config()
     bus = MessageBus()
+
+    # Build debounce overrides from channel configs
+    from nanobot.bus.debouncer import InboundDebouncer
+    debounce_overrides: dict[str, int] = {}
+    for channel_name in ["telegram", "whatsapp", "discord", "slack", "qq", "dingtalk", "feishu", "mochat"]:
+        ch_config = getattr(config.channels, channel_name, None)
+        if ch_config and ch_config.debounce is not None:
+            debounce_overrides[channel_name] = ch_config.debounce
+
+    debouncer = InboundDebouncer(bus=bus, debounce_overrides=debounce_overrides)
+
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)
     
@@ -356,6 +367,7 @@ def gateway(
         restrict_to_workspace=config.tools.restrict_to_workspace,
         session_manager=session_manager,
         mcp_servers=config.tools.mcp_servers,
+        debouncer=debouncer,
     )
     
     # Set cron callback (needs agent)
@@ -400,14 +412,16 @@ def gateway(
     cron_status = cron.status()
     if cron_status["jobs"] > 0:
         console.print(f"[green]✓[/green] Cron: {cron_status['jobs']} scheduled jobs")
-    
+
     console.print(f"[green]✓[/green] Heartbeat: every 30m")
-    
+    console.print(f"[green]✓[/green] Debouncer: enabled")
+
     async def run():
         try:
             await cron.start()
             await heartbeat.start()
             await asyncio.gather(
+                debouncer.run(),
                 agent.run(),
                 channels.start_all(),
             )
@@ -417,6 +431,7 @@ def gateway(
             await agent.close_mcp()
             heartbeat.stop()
             cron.stop()
+            debouncer.stop()
             agent.stop()
             await channels.stop_all()
     
